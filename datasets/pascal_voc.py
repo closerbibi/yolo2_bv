@@ -12,6 +12,7 @@ import scipy.sparse
 from imdb import ImageDataset
 from voc_eval import voc_eval
 # from utils.yolo import preprocess_train
+import pdb
 
 
 class VOCDataset(ImageDataset):
@@ -25,11 +26,18 @@ class VOCDataset(ImageDataset):
         assert os.path.exists(self._devkit_path), 'VOCdevkit path does not exist: {}'.format(self._devkit_path)
         assert os.path.exists(self._data_path), 'Path does not exist: {}'.format(self._data_path)
 
-        self._classes = ('aeroplane', 'bicycle', 'bird', 'boat',
-                         'bottle', 'bus', 'car', 'cat', 'chair',
-                         'cow', 'diningtable', 'dog', 'horse',
-                         'motorbike', 'person', 'pottedplant',
-                         'sheep', 'sofa', 'train', 'tvmonitor')
+        #self._classes = ('aeroplane', 'bicycle', 'bird', 'boat',
+        #                 'bottle', 'bus', 'car', 'cat', 'chair',
+        #                 'cow', 'diningtable', 'dog', 'horse',
+        #                 'motorbike', 'person', 'pottedplant',
+        #                 'sheep', 'sofa', 'train', 'tvmonitor')
+        # gabriel: to nyu classes
+        self._classes = ('__background__', # always index 0
+            'bathtub', 'bed', 'bookshelf', 'box', 'chair', 'counter', 'desk',
+            'door', 'dresser', 'garbage_bin', 'lamp', 'monitor', 'night_stand',
+            'pillow', 'sink', 'sofa', 'table', 'tv', 'toilet');
+
+
         self._class_to_ind = dict(zip(self.classes, range(self.num_classes)))
         self._image_ext = '.jpg'
 
@@ -114,7 +122,7 @@ class VOCDataset(ImageDataset):
 
         return gt_roidb
 
-    def _annotation_from_index(self, index):
+    def _annotation_from_index_original(self, index): # gabriel: load voc annotations
         """
         Load image and bounding boxes info from XML file in the PASCAL VOC
         format.
@@ -167,6 +175,47 @@ class VOCDataset(ImageDataset):
                 'flipped': False,
                 'seg_areas': seg_areas}
 
+    def _annotation_from_index(self, index): # gabriel: load bv annotations
+        """ 
+        Load image and bounding boxes info from txt files of INRIAPerson.
+        """
+        filename = os.path.join(self._data_path, 'Annotations', index + '.txt')
+        # print 'Loading: {}'.format(filename)
+        with open(filename) as f:
+                data = f.read()
+        import re
+        #objs = re.findall('\(\d+, \d+\)[\s\-]+\(\d+, \d+\)', data)
+        objs = re.findall('\(\d+, \d+\)[\s\-]+\(\d+, \d+\)[\s\-]+\(\w+\)', data)
+
+        num_objs = len(objs)
+
+        boxes = np.zeros((num_objs, 4), dtype=np.uint16)
+        gt_classes = np.zeros((num_objs), dtype=np.int32)
+        overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
+
+        # Load object bounding boxes into a data frame.
+        for ix, obj in enumerate(objs):
+            # Make pixel indexes 0-based
+            coor = re.findall('\d+', obj)
+            x1 = float(coor[0])
+            y1 = float(coor[1])
+            x2 = float(coor[2])
+            y2 = float(coor[3])
+            #cls = self._class_to_ind['person']
+            cls = self._class_to_ind[re.findall('\w+', obj)[-1]]
+            boxes[ix, :] = [x1, y1, x2, y2] 
+            gt_classes[ix] = cls 
+            overlaps[ix, cls] = 1.0 
+
+        overlaps = scipy.sparse.csr_matrix(overlaps)
+
+        return {'boxes' : boxes,
+                'gt_classes': gt_classes,
+                'gt_overlaps' : overlaps,
+                'flipped' : False}
+
+
+
     def _get_voc_results_file_template(self):
         # VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
         filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
@@ -199,7 +248,8 @@ class VOCDataset(ImageDataset):
             self._devkit_path,
             'VOC' + self._year,
             'Annotations',
-            '{:s}.xml')
+            '{:s}.txt')
+            #'{:s}.xml') # gabriel: xml to txt
         imagesetfile = os.path.join(
             self._devkit_path,
             'VOC' + self._year,

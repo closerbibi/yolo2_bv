@@ -12,6 +12,7 @@ import utils.yolo as yolo_utils
 import utils.network as net_utils
 from utils.timer import Timer
 import cfgs.config as cfg
+import pdb
 
 try:
     from pycrayon import CrayonClient
@@ -63,7 +64,9 @@ bbox_loss, iou_loss, cls_loss = 0., 0., 0.
 cnt = 0
 t = Timer()
 step_cnt = 0
-for step in range(start_epoch * imdb.batch_per_epoch, cfg.max_epoch * imdb.batch_per_epoch):
+max_epoch = 320 # gabriel
+#for step in range(start_epoch * imdb.batch_per_epoch, cfg.max_epoch * imdb.batch_per_epoch):
+for step in range(start_epoch * imdb.batch_per_epoch, max_epoch * imdb.batch_per_epoch):  # gabriel: 160 -> 320
     t.tic()
     # batch
     batch = imdb.next_batch()
@@ -110,7 +113,7 @@ for step in range(start_epoch * imdb.batch_per_epoch, cfg.max_epoch * imdb.batch
         cnt = 0
         t.clear()
 
-    if step > 0 and (step % imdb.batch_per_epoch == 0):
+    if step > 0 and (step % imdb.batch_per_epoch*10 == 0):
         if imdb.epoch in cfg.lr_decay_epochs:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)

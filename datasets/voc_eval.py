@@ -11,7 +11,7 @@ import numpy as np
 import pdb
 
 
-def parse_rec(filename):
+def parse_rec_original(filename): # gabriel: load xml
     """ Parse a PASCAL VOC xml file """
     tree = ET.parse(filename)
     objects = []
@@ -30,6 +30,26 @@ def parse_rec(filename):
 
     return objects
 
+def parse_rec(filename): # gabriel: load txt
+    """ Parse a txt file """
+    f = open(filename,'r').read().split('\n')[:-1]
+    objects = []
+    for obj in f:
+        obj_struct = {}
+        obj_tmp = obj.split(' - ')
+        X_min = int(obj_tmp[0].split(',')[0].split('(')[1])
+        Y_min = int(obj_tmp[0].split(',')[1].split(' ')[1].split(')')[0])
+        X_max = int(obj_tmp[1].split(',')[0].split('(')[1])
+        Y_max = int(obj_tmp[1].split(',')[1].split(' ')[1].split(')')[0])
+        name = obj_tmp[2].split('(')[1].split(')')[0]
+        obj_struct['name'] = name
+        obj_struct['pose'] = ''
+        obj_struct['truncated'] = 0 
+        obj_struct['difficult'] = 0 
+        obj_struct['bbox'] = [X_min,Y_min,X_max,Y_max]
+        objects.append(obj_struct)
+
+    return objects  
 
 def voc_ap(rec, prec, use_07_metric=False):
     """ ap = voc_ap(rec, prec, [use_07_metric])
