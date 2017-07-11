@@ -10,6 +10,7 @@ import utils.network as net_utils
 from utils.timer import Timer
 from datasets.pascal_voc import VOCDataset
 import cfgs.config as cfg
+import pdb
 
 
 def preprocess(fname):
@@ -24,12 +25,15 @@ def preprocess(fname):
 imdb_name = cfg.imdb_test
 #imdb_name = cfg.imdb_train
 # trained_model = cfg.trained_model
-trained_model = os.path.join(cfg.train_output_dir, 'darknet19_voc07trainval_exp3_318.h5')
+repo = 'hha'
+epoch = 299
+train_output_dir = 'models/training/%s'%(repo)
+trained_model = os.path.join(train_output_dir, 'darknet19_voc07trainval_exp3_%d.h5'%(epoch)) # gabriel: remove default cfg
 output_dir = cfg.test_output_dir
 
 max_per_image = 300
 thresh = 0.01
-vis = False
+vis = False # gabriel
 # ------------
 
 
@@ -102,7 +106,7 @@ def test_net(net, imdb, max_per_image=300, thresh=0.5, vis=False):
         cPickle.dump(all_boxes, f, cPickle.HIGHEST_PROTOCOL)
 
     print 'Evaluating detections'
-    imdb.evaluate_detections(all_boxes, output_dir)
+    imdb.evaluate_detections(all_boxes, repo, epoch, output_dir)
 
 
 if __name__ == '__main__':

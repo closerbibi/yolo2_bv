@@ -19,6 +19,8 @@ try:
 except ImportError:
     CrayonClient = None
 
+max_epoch = 301 # gabriel
+train_output_dir = 'models/training/hha' # gabriel
 
 # data loader
 imdb = VOCDataset(cfg.imdb_train, cfg.DATA_DIR, cfg.train_batch_size,
@@ -38,11 +40,12 @@ print('load net succ...')
 # optimizer
 start_epoch = 0
 lr = cfg.init_learning_rate
+#optimizer = torch.optim.Adam(net.parameters(), lr=lr) # gabriel
 optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
 
 # tensorboad
-use_tensorboard = cfg.use_tensorboard and CrayonClient is not None
-# use_tensorboard = False
+#use_tensorboard = cfg.use_tensorboard and CrayonClient is not None
+use_tensorboard = False # gabriel
 remove_all_log = False
 if use_tensorboard:
     cc = CrayonClient(hostname='127.0.0.1')
@@ -64,9 +67,8 @@ bbox_loss, iou_loss, cls_loss = 0., 0., 0.
 cnt = 0
 t = Timer()
 step_cnt = 0
-max_epoch = 320 # gabriel
 #for step in range(start_epoch * imdb.batch_per_epoch, cfg.max_epoch * imdb.batch_per_epoch):
-for step in range(start_epoch * imdb.batch_per_epoch, max_epoch * imdb.batch_per_epoch):  # gabriel: 160 -> 320
+for step in range(start_epoch * imdb.batch_per_epoch, max_epoch * imdb.batch_per_epoch):  # gabriel: 160 -> 300
     t.tic()
     # batch
     batch = imdb.next_batch()
@@ -113,14 +115,17 @@ for step in range(start_epoch * imdb.batch_per_epoch, max_epoch * imdb.batch_per
         cnt = 0
         t.clear()
 
-    if step > 0 and (step % imdb.batch_per_epoch*10 == 0):
+    if step > 0 and (step % (imdb.epoch*50) == 0):
+        save_name = os.path.join(train_output_dir, '{}_{}.h5'.format(cfg.exp_name, imdb.epoch))
+        net_utils.save_net(save_name, net)
+        print('save model: {}'.format(save_name))
+
+    if step > 0 and (step % imdb.batch_per_epoch == 0):
         if imdb.epoch in cfg.lr_decay_epochs:
             lr *= cfg.lr_decay
             optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=cfg.momentum, weight_decay=cfg.weight_decay)
-
-        save_name = os.path.join(cfg.train_output_dir, '{}_{}.h5'.format(cfg.exp_name, imdb.epoch))
-        net_utils.save_net(save_name, net)
-        print('save model: {}'.format(save_name))
+            # gabriel
+            #optimizer = torch.optim.Adam(net.parameters(), lr=lr) # gabriel
         step_cnt = 0
 
 imdb.close()

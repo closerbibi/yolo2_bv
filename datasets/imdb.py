@@ -2,7 +2,6 @@ import os
 import PIL
 import numpy as np
 from multiprocessing import Pool
-import pdb
 
 
 def mkdir(path, max_depth=3):

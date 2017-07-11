@@ -5,6 +5,7 @@ from im_transform import imcv2_affine_trans, imcv2_recolor
 # from box import BoundBox, box_iou, prob_compare
 from utils.nms_wrapper import nms
 from utils.cython_yolo import yolo_to_bbox
+import pdb
 
 
 def clip_boxes(boxes, im_shape):
@@ -50,10 +51,12 @@ def _offset_boxes(boxes, im_shape, scale, offs, flip):
 
 
 def preprocess_train(data):
+    # default input size(inp_size): 416x416, output size: inp_size/32
     im_path, blob, inp_size = data
     boxes, gt_classes = blob['boxes'], blob['gt_classes']
 
     im = cv2.imread(im_path)
+
     ori_im = np.copy(im)
 
     im, trans_param = imcv2_affine_trans(im)
@@ -201,6 +204,8 @@ def draw_detection(im, bboxes, scores, cls_inds, cfg, thr=0.3):
     labels = cfg.label_names
 
     imgcv = np.copy(im)
+    # gabriel
+    #imgcv = cv2.resize(imgcv, (0,0), fx=2.0, fy=2.0)
     h, w, _ = imgcv.shape
     for i, box in enumerate(bboxes):
         if scores[i] < thr:

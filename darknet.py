@@ -10,7 +10,7 @@ from utils.cython_bbox import bbox_ious, bbox_intersections, bbox_overlaps, anch
 from utils.cython_yolo import yolo_to_bbox
 
 from multiprocessing import Pool
-
+###test
 
 def _make_layers(in_channels, net_cfg):
     layers = []
@@ -254,6 +254,9 @@ class Darknet19(nn.Module):
                 break
             end = min(start+5, len(keys))
             for key in keys[start:end]:
+                #  gabriel: skip first layer
+                if 'conv1s.0.0' in key:
+                    continue
                 list_key = key.split('.')
                 ptype = dest_src['{}.{}'.format(list_key[-2], list_key[-1])]
                 src_key = '{}-convolutional/{}:0'.format(i, ptype)

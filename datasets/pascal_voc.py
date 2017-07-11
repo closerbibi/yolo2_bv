@@ -12,8 +12,8 @@ import scipy.sparse
 from imdb import ImageDataset
 from voc_eval import voc_eval
 # from utils.yolo import preprocess_train
-import pdb
 
+import pdb
 
 class VOCDataset(ImageDataset):
     def __init__(self, imdb_name, datadir, batch_size, im_processor, processes=3, shuffle=True, dst_size=None):
@@ -58,7 +58,7 @@ class VOCDataset(ImageDataset):
         self._image_names = [self.image_path_from_index(index) for index in self.image_indexes]
         self._annotations = self._load_pascal_annotations()
 
-    def evaluate_detections(self, all_boxes, output_dir=None):
+    def evaluate_detections(self, all_boxes, repo, epoch, output_dir=None): # gabriel
         """
         all_boxes is a list of length number-of-classes.
         Each list element is a list of length number-of-images.
@@ -67,14 +67,16 @@ class VOCDataset(ImageDataset):
 
         all_boxes[class][image] = [] or np.array of shape #dets x 5
         """
-        self._write_voc_results_file(all_boxes)
-        self._do_python_eval(output_dir)
+        self._write_voc_results_file(all_boxes, repo, epoch) # gabriel
+        #self._write_voc_results_file(all_boxes)
+        self._do_python_eval(repo, epoch, output_dir) # gabriel
         if self.config['cleanup']:
             for cls in self._classes:
                 if cls == '__background__':
                     continue
-                filename = self._get_voc_results_file_template().format(cls)
-                os.remove(filename)
+                #filename = self._get_voc_results_file_template().format(cls)
+                filename = self._get_voc_results_file_template(cls, repo, epoch) # gabriel
+                #os.remove(filename)
 
     # -------------------------------------------------------------
     def image_path_from_index(self, index):
@@ -216,21 +218,24 @@ class VOCDataset(ImageDataset):
 
 
 
-    def _get_voc_results_file_template(self):
+    def _get_voc_results_file_template(self, cls, repo, epoch):
         # VOCdevkit/results/VOC2007/Main/<comp_id>_det_test_aeroplane.txt
-        filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
-        filedir = os.path.join(self._devkit_path, 'results', 'VOC' + self._year, 'Main')
+        filename = '%s.txt'%(cls) # gabriel
+        #filename = self._get_comp_id() + '_det_' + self._image_set + '_{:s}.txt'
+        filedir = os.path.join(self._devkit_path, '../..','results', repo, str(epoch)) # gabriel
+        #filedir = os.path.join(self._devkit_path, 'results', 'VOC' + self._year, 'Main')
         if not os.path.exists(filedir):
             os.makedirs(filedir)
         path = os.path.join(filedir, filename)
         return path
 
-    def _write_voc_results_file(self, all_boxes):
+    def _write_voc_results_file(self, all_boxes, repo, epoch): # gabriel
         for cls_ind, cls in enumerate(self.classes):
             if cls == '__background__':
                 continue
             print 'Writing {} VOC results file'.format(cls)
-            filename = self._get_voc_results_file_template().format(cls)
+            #filename = self._get_voc_results_file_template().format(cls)
+            filename = self._get_voc_results_file_template(cls, repo, epoch) # gabriel
             with open(filename, 'wt') as f:
                 for im_ind, index in enumerate(self.image_indexes):
                     dets = all_boxes[cls_ind][im_ind]
@@ -243,7 +248,7 @@ class VOCDataset(ImageDataset):
                                        dets[k, 0] + 1, dets[k, 1] + 1,
                                        dets[k, 2] + 1, dets[k, 3] + 1))
 
-    def _do_python_eval(self, output_dir='output'):
+    def _do_python_eval(self, repo, epoch, output_dir='output'): # gabriel
         annopath = os.path.join(
             self._devkit_path,
             'VOC' + self._year,
@@ -257,38 +262,46 @@ class VOCDataset(ImageDataset):
             'Main',
             self._image_set + '.txt')
         cachedir = os.path.join(self._devkit_path, 'annotations_cache')
-        aps = []
+        aps = []; recs = []
         # The PASCAL VOC metric changed in 2010
         use_07_metric = True if int(self._year) < 2010 else False
         print 'VOC07 metric? ' + ('Yes' if use_07_metric else 'No')
         if output_dir is not None and not os.path.isdir(output_dir):
             os.mkdir(output_dir)
+        # gabriel: write result to file
+        resultdir = os.path.join(self._devkit_path, '../..','results', repo, str(epoch))
+        resultf = open(resultdir + '/' + 'results.txt','w')
         for i, cls in enumerate(self._classes):
             if cls == '__background__':
                 continue
-            filename = self._get_voc_results_file_template().format(cls)
-            rec, prec, ap = voc_eval(
+            #filename = self._get_voc_results_file_template().format(cls)
+            filename = self._get_voc_results_file_template(cls, repo, epoch) # gabriel
+            rec, prec, ap, pred_box, gt_box = voc_eval(
                 filename, annopath, imagesetfile, cls, cachedir, ovthresh=0.5,
                 use_07_metric=use_07_metric)
             aps += [ap]
-            print('AP for {} = {:.4f}'.format(cls, ap))
+            recs += [rec[-1]] # gabriel
+            print('AP = {:.4f}, maxRec = {:.4f} for {:11s}, pred box={:5d}, gt={:5d}'.format(ap, rec[-1], cls, pred_box, gt_box)) #gabriel
+            resultf.write('AP = {:.4f}, maxRec = {:.4f} for {:11s}, pred box={:5d}, gt={:5d}\n'.format(ap, rec[-1], cls, pred_box, gt_box))
             if output_dir is not None:
                 with open(os.path.join(output_dir, cls + '_pr.pkl'), 'w') as f:
                     cPickle.dump({'rec': rec, 'prec': prec, 'ap': ap}, f)
+        resultf.close()
         print('Mean AP = {:.4f}'.format(np.mean(aps)))
-        print('~~~~~~~~')
-        print('Results:')
-        for ap in aps:
-            print('{:.3f}'.format(ap))
-        print('{:.3f}'.format(np.mean(aps)))
-        print('~~~~~~~~')
-        print('')
-        print('--------------------------------------------------------------')
-        print('Results computed with the **unofficial** Python eval code.')
-        print('Results should be very close to the official MATLAB eval code.')
-        print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
-        print('-- Thanks, The Management')
-        print('--------------------------------------------------------------')
+        print('Mean maxRecall = {:.4f}'.format(np.mean(recs))) # gabriel
+        #print('~~~~~~~~')
+        #print('Results:')
+        #for ap in aps:
+        #    print('{:.3f}'.format(ap))
+        #print('{:.3f}'.format(np.mean(aps)))
+        #print('~~~~~~~~')
+        #print('')
+        #print('--------------------------------------------------------------')
+        #print('Results computed with the **unofficial** Python eval code.')
+        #print('Results should be very close to the official MATLAB eval code.')
+        #print('Recompute with `./tools/reval.py --matlab ...` for your paper.')
+        #print('-- Thanks, The Management')
+        #print('--------------------------------------------------------------')
 
     def _get_comp_id(self):
         comp_id = (self._comp_id + '_' + self._salt if self.config['use_salt']
